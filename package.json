@@ -1,0 +1,44 @@
+{
+  "name": "gateway",
+  "version": "0.1.0",
+  "description": "A simple application to act allow as a gateway and handle authentication.",
+  "main": "index.js",
+  "dependencies": {
+    "connect-redis": "4.0.3",
+    "express": "4.17.1",
+    "express-session": "1.16.2",
+    "http-proxy": "1.18.0",
+    "passport": "0.4.0",
+    "passport-oauth": "1.0.0",
+    "passport-oauth2": "1.5.0",
+    "redis": "2.8.0"
+  },
+  "devDependencies": {
+    "@types/connect-redis": "0.0.11",
+    "@types/express": "4.17.1",
+    "eslint": "6.5.1",
+    "eslint-config-airbnb-base": "14.0.0",
+    "eslint-plugin-import": "2.18.2",
+    "jest": "24.9.0",
+    "sinon": "7.5.0"
+  },
+  "scripts": {
+    "start": "node index.js",
+    "test": "node_modules/jest/bin/jest.js --silent",
+    "eslint": "node_modules/eslint/bin/eslint.js '**/*.js'"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/eventkit/gateway.git"
+  },
+  "keywords": [
+    "gateway",
+    "authentication"
+  ],
+  "author": "jsvrcek",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/eventkit/gateway/issues"
+  },
+  "homepage": "https://github.com/eventkit/gateway#readme"
+}
