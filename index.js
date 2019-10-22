@@ -45,6 +45,7 @@ if (usingOauth()) {
   },
   (request, accessToken, refreshToken, profile, done) => {
     if (accessToken) {
+      console.log(`Allowing access for: ${JSON.stringify(profile)}`);
       done(null, profile);
     }
   }));
@@ -54,13 +55,12 @@ if (usingOauth()) {
     if (req.query && req.query.state) {
       state = req.query.state;
     }
-    const authenticator = passport.authenticate('oracle', { scope: ['openid', 'profile'], state });
-
+    const authenticator = passport.authenticate('oracle', { scope: config.oauth.scope, state });
     authenticator(req, res, next);
   });
 
   app.get('/auth/oracle/callback',
-    passport.authenticate('oracle'),
+    passport.authenticate('oracle', { failureRedirect: '/' }),
     (req, res) => {
       try {
         const { state } = req.query;

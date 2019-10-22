@@ -39,9 +39,6 @@ if (process.env.VCAP_SERVICES) {
     config.oauth.clientID = identityConfig.client_id;
     config.oauth.clientSecret = identityConfig.client_secret;
   }
-
-  const application = JSON.parse(process.env.VCAP_APPLICATION);
-  [config.host] = application.application_uris;
 }
 
 // Use params defined in the environment.
