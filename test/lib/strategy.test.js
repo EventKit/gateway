@@ -10,7 +10,7 @@ const baseConfig = {
   clientID: 'ID',
   clientSecret: 'SECRET',
   logoutURL: 'http://test.test/logout',
-}
+};
 
 test('Contructor works.', () => {
   const strategy = new OAuth2Strategy({
