@@ -100,7 +100,7 @@ const addPath = (entry) => {
   console.log(`Creating Proxy Path for ${path} to ${target}.`);
   const regexPath = `^/${path}(/.*)?*`;
   app.get(regexPath, ensureAuthenticated, proxyRequest(path, target));
-}
+};
 
 Object.entries(config.proxy).forEach(addPath);
 
