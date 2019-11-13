@@ -45,7 +45,6 @@ if (usingOauth()) {
   },
   (request, accessToken, refreshToken, profile, done) => {
     if (accessToken) {
-      console.log(`Allowing access for: ${JSON.stringify(profile)}`);
       done(null, profile);
     }
   }));
@@ -62,6 +61,7 @@ if (usingOauth()) {
   app.get('/auth/oracle/callback',
     passport.authenticate('oracle', { failureRedirect: '/' }),
     (req, res) => {
+      console.warn(`Allowing access for: ${JSON.stringify(req.user)}`);
       try {
         const { state } = req.query;
         const returnTo = Buffer.from(state, 'base64').toString();
