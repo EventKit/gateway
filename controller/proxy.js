@@ -14,7 +14,7 @@ function proxyRequest(path, target) {
         proxyRes.writeHead(500, {
           'Content-Type': 'application/json',
         });
-        proxyRes.end(JSON.stringify({error: 'Unable to reach that URL. Please contact an administrator.'}));
+        proxyRes.end(JSON.stringify({ error: 'Unable to reach that URL. Please contact an administrator.' }));
       } catch (err) {
         // Response already sent carry on.
       }
