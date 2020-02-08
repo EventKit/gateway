@@ -4,12 +4,7 @@ let config = {
   host: 'localhost',
   logoutTime: '1200000', // in ms.
   sessionSecret: null,
-  redis: {
-    host: 'localhost',
-    port: 6379,
-    password: null,
-    db: 1,
-  },
+  redis: {},
   proxy: {}, // example: {'api': 'http://myapi.test/'}
   oauth: {
     baseURL: null,
