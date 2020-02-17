@@ -1,10 +1,11 @@
 {
   "name": "gateway",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "A simple application to act allow as a gateway and handle authentication.",
   "main": "index.js",
   "dependencies": {
     "connect-redis": "4.0.3",
+    "cookie-parser": "1.4.4",
     "express": "4.17.1",
     "express-session": "1.16.2",
     "http-proxy": "1.18.0",
