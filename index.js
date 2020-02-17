@@ -5,7 +5,7 @@ const redis = require('redis');
 const RedisStore = require('connect-redis')(session);
 const FileStore = require('session-file-store')(session);
 const fs = require('fs');
-const cookieParser = require('cookie-parser')
+const cookieParser = require('cookie-parser');
 const OAuth2Strategy = require('./lib/strategy');
 const config = require('./config/config');
 const proxyRequest = require('./controller/proxy');
@@ -64,7 +64,7 @@ app.use(cookieParser());
 app.use((req, res, next) => {
   // eslint-disable-next-line no-underscore-dangle
   const cookie = req.cookies.__VCAP_ID__;
-  if (cookie !== undefined){
+  if (cookie !== undefined) {
     res.cookie('__VCAP_ID__', cookie, { maxAge: Number(config.logoutTime), secure: true });
   }
   next();
