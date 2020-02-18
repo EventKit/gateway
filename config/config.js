@@ -1,15 +1,14 @@
+const path = require('path');
+
 // Set a default config
 let config = {
   port: '8080',
   host: 'localhost',
   logoutTime: '1200000', // in ms.
   sessionSecret: null,
-  redis: {
-    host: 'localhost',
-    port: 6379,
-    password: null,
-    db: 1,
-  },
+  sessionName: null,
+  redis: {},
+  fileStore: {},
   proxy: {}, // example: {'api': 'http://myapi.test/'}
   oauth: {
     baseURL: null,
@@ -39,13 +38,17 @@ if (process.env.VCAP_SERVICES) {
     config.oauth.clientID = identityConfig.client_id;
     config.oauth.clientSecret = identityConfig.client_secret;
   }
+  if (services.nfs) {
+    config.fileStore.path = path.join(services.nfs[0].volume_mounts[0].container_dir, 'pelias');
+  }
 }
 
 // Use params defined in the environment.
 config = process.env.GATEWAY_CONFIG ? JSON.parse(process.env.GATEWAY_CONFIG) : config;
 config.port = process.env.PORT || config.port;
 config.host = process.env.HOST || config.host;
-config.logoutTime = process.env.LOGOUT_TIME || config.logoutTime;
+config.logoutTime = (Number(process.env.LOGOUT_TIME) * 1000) || config.logoutTime;
+config.fileStore.ttl = (Number(config.logoutTime) / 1000);
 config.sessionSecret = process.env.SESSION_SECRET;
 config.proxy = process.env.PROXY ? JSON.parse(process.env.PROXY) : config.proxy;
 config.redis.host = process.env.REDIS_HOST || config.redis.host;
