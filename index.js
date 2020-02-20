@@ -82,7 +82,7 @@ if (usingOauth()) {
     callbackURL: `https://${config.host}/auth/oracle/callback`,
   },
   (request, accessToken, refreshToken, profile, done) => {
-    if (accessToken) {
+    if (accessToken || profile) {
       done(null, profile);
     }
   }));
@@ -100,7 +100,9 @@ if (usingOauth()) {
   app.get('/auth/oracle/callback', (req, res, next) => {
     // eslint-disable-next-line consistent-return
     passport.authenticate('oracle', (err, user) => {
+
       if (err) {
+        console.error(err)
         return res.redirect('/auth/logout');
       }
       if (!user) {
@@ -109,7 +111,7 @@ if (usingOauth()) {
       req.logIn(user, (loginError) => {
         console.log(`Logging in: ${JSON.stringify(user)}`);
         if (loginError) {
-          console.log(loginError.request.message);
+          console.error(loginError.request.message);
           return next(loginError);
         }
         const { state } = req.query;
