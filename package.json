@@ -4,7 +4,6 @@
   "description": "A simple application to act allow as a gateway and handle authentication.",
   "main": "index.js",
   "dependencies": {
-    "base-64": "^0.1.0",
     "connect-redis": "4.0.3",
     "cookie-parser": "1.4.4",
     "express": "4.17.1",
