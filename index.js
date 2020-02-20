@@ -100,9 +100,8 @@ if (usingOauth()) {
   app.get('/auth/oracle/callback', (req, res, next) => {
     // eslint-disable-next-line consistent-return
     passport.authenticate('oracle', (err, user) => {
-
       if (err) {
-        console.error(err)
+        console.error(err);
         return res.redirect('/auth/logout');
       }
       if (!user) {
