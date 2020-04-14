@@ -3,9 +3,12 @@ const passport = require('passport');
 const session = require('express-session');
 const redis = require('redis');
 const RedisStore = require('connect-redis')(session);
-const FileStore = require('session-file-store')(session);
-const fs = require('fs');
 const cookieParser = require('cookie-parser');
+const jwt = require('jsonwebtoken');
+const passportJWT = require('passport-jwt');
+
+const JWTStrategy = passportJWT.Strategy;
+const { ExtractJwt } = passportJWT;
 const OAuth2Strategy = require('./lib/strategy');
 const config = require('./config/config');
 const proxyRequest = require('./controller/proxy');
@@ -13,70 +16,106 @@ const proxyRequest = require('./controller/proxy');
 const app = express();
 
 app.set('trust proxy', 1);
+app.disable('x-powered-by');
+app.use(cookieParser());
+
+passport.serializeUser((user, done) => {
+  done(null, user);
+});
+
+passport.deserializeUser((obj, done) => {
+  done(null, obj);
+});
+
+const getToken = (user, timeout) => {
+  let userId = null;
+  const profileField = config.userProfileId;
+  try {
+    /* eslint-disable no-underscore-dangle */
+    userId = profileField && user._json[profileField]
+      ? { [profileField]: user._json[profileField] }
+      : user._json;
+  } catch (err) {
+    userId = user._json;
+    /* eslint-enable no-underscore-dangle */
+  }
+  userId = userId || user;
+  return jwt.sign(userId, config.jwtSecret, { expiresIn: timeout });
+};
+
+const TOKEN_COOKIE = 'jwt';
+const TOKEN_PARAM = 'token';
+
+const setTokenCookie = (res, token) => {
+  if (token) {
+    res.cookie(TOKEN_COOKIE, token, { maxAge: config.logoutTime, secure: false });
+  }
+};
+
+const removeTokenCookie = (res) => res.cookie(TOKEN_COOKIE, { expires: Date.now() });
+
+const cookieExtractor = (req) => {
+  if (req && req.cookies) {
+    const token = req.cookies[TOKEN_COOKIE];
+    return token;
+  }
+  return null;
+};
 
 if (config.sessionSecret) {
-  passport.serializeUser((user, done) => {
-    done(null, user);
-  });
-
-  passport.deserializeUser((obj, done) => {
-    done(null, obj);
-  });
-
   let store;
   if (config.redis.host) {
     const client = redis.createClient({ ...config.redis });
     store = new RedisStore({ client });
     console.log(`Using redis store: ${JSON.stringify(store)}`);
-  } else {
-    if (config.fileStore.path) {
-      if (!fs.existsSync(config.fileStore.path)) {
-        fs.mkdirSync(config.fileStore.path);
-      }
-    } else if (process.env.VCAP_SERVICES) {
-      // If not using a common file path then use sticky sessions.
-      config.sessionName = 'JSESSIONID';
-    }
-    store = new FileStore(config.fileStore);
-    console.log(`Using file store: ${JSON.stringify(store)}`);
+    app.use(session({
+      store,
+      name: config.sessionName,
+      secret: config.sessionSecret,
+      genid: config.sessionGenId,
+      resave: false,
+      saveUninitialized: false,
+      cookie: {
+        maxAge: Number(config.logoutTime),
+        secure: true,
+      },
+    }));
   }
+}
 
-  app.use(session({
-    store,
-    name: config.sessionName,
-    secret: config.sessionSecret,
-    genid: config.sessionGenId,
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      maxAge: Number(config.logoutTime),
-      secure: true,
-    },
+if (config.jwtSecret) {
+  const opts = {};
+  opts.jwtFromRequest = ExtractJwt.fromExtractors([ExtractJwt.fromAuthHeaderAsBearerToken(),
+    ExtractJwt.fromUrlQueryParameter(TOKEN_PARAM), cookieExtractor]);
+  opts.secretOrKey = config.jwtSecret;
+  passport.use(new JWTStrategy(opts, (jwtPayload, done) => {
+    if (Date.now() > jwtPayload.expires) {
+      return done('jwt expired');
+    }
+    if (config.userProfileId && jwtPayload[config.userProfileId]) {
+      return done(null, jwtPayload);
+    }
+    if (jwtPayload) {
+      return done(null, jwtPayload);
+    }
+    return done(null, false);
   }));
-  app.use(passport.initialize());
+}
+
+// After everything is configured initialize passport.
+app.use(passport.initialize());
+if (config.sessionSecret) {
   app.use(passport.session());
 }
 
-// Set cookie if using PCF
-app.use(cookieParser());
-
-// This is used for PCF sticky sessions.
-app.use((req, res, next) => {
-  // eslint-disable-next-line no-underscore-dangle
-  const cookie = req.cookies.__VCAP_ID__;
-  if (cookie !== undefined) {
-    res.cookie('__VCAP_ID__', cookie, { maxAge: Number(config.logoutTime), secure: true });
-  }
-  next();
-});
+if (config.jwtSecret) {
+  app.get('/auth/token', (req, res) => res.redirect('/auth/oracle'));
+}
 
 const usingOauth = () => !!(config.oauth.authorizationURL || config.oauth.baseURL);
+const usingSession = () => !!(config.sessionSecret);
 
 if (usingOauth()) {
-  if (!config.sessionSecret) {
-    throw Error('Cannot use Oauth without configuring SESSION_SECRET');
-  }
-  // TODO: allow other strategies and/or multiple oauth
   passport.use(new OAuth2Strategy({
     ...config.oauth,
     callbackURL: `https://${config.host}/auth/oracle/callback`,
@@ -93,7 +132,7 @@ if (usingOauth()) {
       state = req.query.state;
     }
     const authenticator = passport.authenticate('oracle',
-      { session: true, scope: config.oauth.scope, state });
+      { session: usingSession(), scope: config.oauth.scope, state });
     authenticator(req, res, next);
   });
 
@@ -105,50 +144,81 @@ if (usingOauth()) {
         return res.redirect('/auth/logout');
       }
       if (!user) {
-        return res.redirect('/');
+        return res.redirect('/auth/logout');
       }
-      req.logIn(user, (loginError) => {
-        console.log(`Logging in: ${JSON.stringify(user)}`);
-        if (loginError) {
-          console.error(loginError.request.message);
-          return next(loginError);
+
+      req.login(user, (loginErr) => {
+        if (loginErr) {
+          return res.redirect('/auth/logout');
         }
+
+        // If using tokens, add it to the header to allow users to make requests in their browsers.
+        let token = null;
+        if (config.jwtSecret) {
+          const maxAge = config.logoutTime;
+          token = getToken(user, maxAge);
+        }
+        setTokenCookie(res, token);
         const { state } = req.query;
-        let returnTo = Buffer.from(state, 'base64').toString();
+        let returnTo = null;
+        if (state) {
+          returnTo = Buffer.from(state, 'base64').toString();
+        }
+        if (req.session) {
+          returnTo = returnTo || req.session.returnTo;
+          delete req.session.returnTo;
+        }
         if (typeof returnTo === 'string' && returnTo.startsWith('/')) {
           return res.redirect(returnTo);
         }
-        returnTo = req.session.returnTo;
-        delete req.session.returnTo;
-        return res.redirect(returnTo || '/');
+        if (token) {
+          // If using tokens, send it to the user as a response (e.g. /token endpoint)
+          return res.send({ token });
+        }
+        return res.redirect('/');
       });
     })(req, res, next);
   });
 }
 
-app.get('/auth/logout', (req, res) => {
+
+const handleLogout = (req, res) => {
   req.logout();
+  removeTokenCookie(res);
   if (config.oauth.logoutURL) {
     return res.redirect(config.oauth.logoutURL);
   }
   return res.redirect('/');
-});
+};
+
+app.get('/auth/logout', handleLogout);
 
 const ensureAuthenticated = (req, res, next) => {
   try {
-    if (req.isAuthenticated()) {
+    if (!req.isAuthenticated() && config.jwtSecret) {
+      passport.authenticate('jwt', { session: usingSession() }, (err, user) => {
+        if (err) {
+          console.error(`Error: ${err}`);
+        }
+        if (user) {
+          return next();
+        }
+        const state = Buffer.from(req.url).toString('base64');
+        if (usingOauth()) {
+          req.logout();
+          return res.redirect(`/auth/oracle?state=${state}`);
+        }
+        return res.redirect('/auth/logout');
+      })(req, res, next);
+    } else {
       return next();
     }
   } catch (err) {
-    return res.redirect('/auth/logout');
+    console.error(err);
   }
-  const state = Buffer.from(req.url).toString('base64');
-  if (usingOauth()) {
-    req.logout();
-    return res.redirect(`/auth/oracle?state=${state}`);
-  }
-  return res.redirect('/auth/logout');
+  return null;
 };
+
 
 const addPath = (entry) => {
   const [path, target] = entry;
@@ -162,3 +232,13 @@ Object.entries(config.proxy).forEach(addPath);
 app.listen(config.port, () => {
   console.log(`Gateway listening on port ${config.port}...`);
 });
+
+module.exports = {
+  getToken,
+  setTokenCookie,
+  removeTokenCookie,
+  handleLogout,
+  TOKEN_COOKIE,
+  TOKEN_PARAM,
+  cookieExtractor,
+};

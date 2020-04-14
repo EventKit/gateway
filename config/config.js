@@ -7,8 +7,10 @@ let config = {
   logoutTime: '1200000', // in ms.
   sessionSecret: null,
   sessionName: null,
+  jwtSecret: null,
   redis: {},
   fileStore: {},
+  userProfileId: 'username',
   proxy: {}, // example: {'api': 'http://myapi.test/'}
   oauth: {
     baseURL: null,
@@ -50,6 +52,8 @@ config.host = process.env.HOST || config.host;
 config.logoutTime = (Number(process.env.LOGOUT_TIME) * 1000) || config.logoutTime;
 config.fileStore.ttl = (Number(config.logoutTime) / 1000);
 config.sessionSecret = process.env.SESSION_SECRET;
+config.jwtSecret = process.env.JWT_SECRET;
+config.userProfileId = process.env.USER_PROFILE_ID;
 config.proxy = process.env.PROXY ? JSON.parse(process.env.PROXY) : config.proxy;
 config.redis.host = process.env.REDIS_HOST || config.redis.host;
 config.redis.port = process.env.REDIS_PORT || config.redis.port;
