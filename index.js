@@ -83,6 +83,7 @@ if (config.sessionSecret) {
   }
 }
 
+
 if (config.jwtSecret) {
   const opts = {};
   opts.jwtFromRequest = ExtractJwt.fromExtractors([ExtractJwt.fromAuthHeaderAsBearerToken(),
@@ -219,6 +220,30 @@ const ensureAuthenticated = (req, res, next) => {
   return null;
 };
 
+const handleReferer = (req, res, next) => {
+  // This is used to try to catch traffic which might need to be routed back to a proxied app.
+  const hostname = config.host;
+  if (req.headers && req.headers.referer) {
+    // eslint-disable-next-line no-undef
+    const refererUrl = new URL(req.headers.referer);
+    if (refererUrl.pathname === '/') {
+      // There is no path referer
+      return next();
+    }
+    if (refererUrl.hostname === hostname) {
+      const pathRegex = /[^/\\]+/;
+      const path = refererUrl.pathname.match(pathRegex)[0];
+      if (path in config.proxy) {
+        if (!req.path.startsWith(`/${path}/`)) {
+          // Send the user to the correct route.
+          return res.redirect(`/${path}${req.originalUrl}`);
+        }
+      }
+    }
+  }
+  return next();
+};
+
 
 const addPath = (entry) => {
   const [path, target] = entry;
@@ -226,6 +251,8 @@ const addPath = (entry) => {
   const regexPath = `^/${path}(/.*)?*`;
   app.get(regexPath, ensureAuthenticated, proxyRequest(path, target));
 };
+
+app.all('*', handleReferer);
 
 Object.entries(config.proxy).forEach(addPath);
 
